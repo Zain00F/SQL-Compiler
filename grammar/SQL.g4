@@ -218,6 +218,7 @@ USER_VARIABLE: '@' [a-zA-Z_][a-zA-Z0-9_]*;
 // System Variables - start with @@
 SYSTEM_VARIABLE: '@@' [a-zA-Z_][a-zA-Z0-9_]*;
 
+//Literals
 // Numbers
 INTEGER: [0-9]+;
 FLOAT: [0-9]+ '.' [0-9]+;
@@ -258,8 +259,12 @@ BIT_STRING: [bB] '\'' [01]+ '\'' | '0b' [01]+
 // Single Line Comment - -- or //
 SINGLE_LINE_COMMENT: ('--' | '//') ~[\r\n]* -> skip;
 
-// Multi Line Comment - /* ... */
-MULTI_LINE_COMMENT: '/*' .*? '*/' -> skip;
+//Nested Multi Line Comment - /* ... */
+//? Nesting uses Recursion
+NESTED_BLOCK_COMMENT
+    : '/*' ( NESTED_BLOCK_COMMENT | . )*? '*/'
+    -> skip
+    ;
 
 // Whitespace - skip
 WS: [ \t\r\n]+ -> skip;
