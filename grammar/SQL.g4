@@ -76,6 +76,7 @@ FALSE: 'FALSE';
 FULL: 'FULL';
 FUNCTION: 'FUNCTION';
 GOTO: 'GOTO';
+GO: 'GO';
 GRANT: 'GRANT';
 GROUP: 'GROUP';
 HAVING: 'HAVING';
@@ -189,6 +190,9 @@ WITH: 'WITH';
 WITHIN: 'WITHIN';
 WRITETEXT: 'WRITETEXT';
 
+// Assign operators
+ASSIGN_ADD: '+=';
+ASSIGN_MIN: '-=';
 // Arithmetic operators
 PLUS: '+';
 MINUS: '-';
@@ -210,7 +214,7 @@ LEFT_BRACKET: '[';
 RIGHT_BRACKET: ']';
 
 // Identifiers must start with at least one character
-IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]*;
+IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]* ;
 
 // User Variables - start with @
 USER_VARIABLE: '@' [a-zA-Z_][a-zA-Z0-9_]*;
@@ -245,10 +249,17 @@ DOUBLE_QUOTE_STRING: '"' (~'"' | '""')* '"'
     };
 
 // Hex String - 0x... or X'...'
-HEX_STRING: '0x' [0-9A-Fa-f]+ | 'X\'' [0-9A-Fa-f]+ '\'';
+//'\\\n' for it take the \\n for us to replace it. cuz it doesn't even read it
+HEX_STRING: 'X\'' [0-9A-Fa-f]+ '\'' | '0x' [0-9A-Fa-f]+  '\\\n'  [0-9A-Fa-f]+
+
+    {
+        text = self.text
+        text = text.replace("\\\n", "")
+        self.text = text
+    };
 
 // Bit String - b'...' or B'...' or 0b...
-BIT_STRING: [bB] '\'' [01]+ '\'' | '0b' [01]+
+BIT_STRING: [bB] '\'' [01]+ '\'' | '0b' [01]+  '\\\n' [01]+ 
     {
         text = self.text
         text = text.replace("\\\n", "")
@@ -257,13 +268,12 @@ BIT_STRING: [bB] '\'' [01]+ '\'' | '0b' [01]+
 
 // Comments fragment
 // Single Line Comment - -- or //
-SINGLE_LINE_COMMENT: ('--' | '//') ~[\r\n]* -> skip;
+SINGLE_LINE_COMMENT: ('--' | '//') ~[\r\n]* ;
 
 //Nested Multi Line Comment - /* ... */
 //? Nesting uses Recursion
 NESTED_BLOCK_COMMENT
     : '/*' ( NESTED_BLOCK_COMMENT | . )*? '*/'
-    -> skip
     ;
 
 // Whitespace - skip

@@ -1,22 +1,58 @@
--- Test 1: Simple case - should parse as two SELECT statements
-SELECT 'before' AS test1; SELECT 'after' AS test2;
 
--- Test 2: With simple nested comment between - should still parse as two SELECTs
-SELECT 'before' AS test1; /* outer /* inner */ outer */ SELECT 'after' AS test2;
+CREATE TABLE [dbo].[DIAGNOSIS](
+	[DIAGNOSIS_KEY'1] [int] NOT NULL,
+	[DIAGNOSIS_NAME] [nvarchar](300) NOT NULL,
+	[DIAGNOSIS_CATEGORY_KEY] [int] NULL
+	)
 
--- Test 3: Nested comment containing SQL that should be ignored
-SELECT 'visible' AS test; /* comment with SELECT 'hidden' FROM table; /* nested SELECT 'also_hidden'; */ more comment */ SELECT 'also_visible' AS test2;
+IF NOT EXISTS ( 
+    SELECT 1 FROM sys.columns
+    WHERE Name = 'KEY1''S'
+      AND Object_ID = Object_ID('FACT1')
+)
+BEGIN
+		ALTER TABLE FACT1 
+        ADD [KEY1'S] INT NULL;
+END
+GO
 
--- Test 4: Multi-level nesting test
-SELECT 'start' AS test; /* level1 /* level2 /* level3 */ back2 */ back1 */ SELECT 'end' AS test;
+UPDATE FACT1
+SET [KEY1'S] =
+    CASE 
+        WHEN KEY2 = 4 OR KEY3 IN (1,7) THEN 1
+        WHEN KEY5 = 2 THEN 2
+        ELSE 0
+    END
+WHERE [KEY1'S] IS NULL;
+GO
 
--- Test 5: Test that shows incorrect parsing (if nesting fails)
--- If nested comments don't work, this might break:
-SELECT 'test' AS col /* outer comment /* inner comment with */ fake end */ SELECT 'should_work' AS col2;
+IF NOT EXISTS (
+    SELECT 1 FROM sys.columns 
+    WHERE Name = 'HASH2' 
+      AND Object_ID = Object_ID('FACT_2')
+)
+BEGIN
+    ALTER TABLE FACT_2 
+    ADD HASH2 BIGINT NULL;
+END
+GO
 
--- Test 6: Line comment mixed with nested block comment
-SELECT 'before_line' AS test; -- line comment /* this should not start a block
-SELECT 'after_line' AS test;
+IF NOT EXISTS (
+    SELECT 1 FROM sys.columns 
+    WHERE Name = 'DIAGNOSIS_KEY''1' 
+      AND Object_ID = Object_ID('FACT_2')
+)
+BEGIN
+    ALTER TABLE FACT_2 
+    ADD [DIAGNOSIS_KEY'1] INT NULL;
+END
+GO
 
--- Test 7: Verify that content inside nested comments is truly ignored
-SELECT 'real_query' AS test /* fake query: SELECT * FROM /* nested SELECT COUNT(*) FROM users */ nonexistent_table */ ;
+
+DECLARE @ErrorMessage         NVARCHAR(4000)          
+DECLARE @ErrorState           INT          
+DECLARE @ErrorSeverity        INT 
+
+/* DROP CONSTARINTS */
+declare @sql_drop_constarints nvarchar(max)
+set @sql_drop_constarints = ''
