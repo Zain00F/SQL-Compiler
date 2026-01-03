@@ -1,6 +1,31 @@
 lexer grammar SQL;
 
-// Reserved keywords
+// 1. Specific Bracketed Identifiers (Highest Priority)
+BRACKET_IDENTIFIER: '[' ( ~']'  | ']]')* ']'
+    {
+        text = self.text[1:-1].replace("]]", "]")
+        self.text = text
+    };
+
+// 2. Unicode Strings (Must be ABOVE Identifier so 'N' isn't stolen)
+UNICODE_STRING: [nN] '\'' ( ~'\'' | '\'\'')* '\'' 
+    {
+        text = self.text[2:-1].replace("''", "'")
+        self.text = text
+    };
+
+// 3. Compound Operators (Must be ABOVE PLUS/EQUALS)
+ASSIGN_ADD: '+=';
+ASSIGN_MIN: '-=';
+
+// 4. Standard Strings
+SINGLE_QUOTE_STRING: '\'' (~'\'' | '\'\'')* '\''
+    {
+        text = self.text[1:-1].replace("''", "'")
+        self.text = text
+    };
+
+// 5. Reserved Keywords (ADD, SELECT, etc. go here...)
 ADD: 'ADD';
 ALL: 'ALL';
 ALTER: 'ALTER';
@@ -189,10 +214,16 @@ WHILE: 'WHILE';
 WITH: 'WITH';
 WITHIN: 'WITHIN';
 WRITETEXT: 'WRITETEXT';
+INT: 'INT';
+BIGINT: 'BIGINT';
+NVARCHAR: 'NVARCHAR';
+SUM: 'SUM';
+// 6. Variables
+USER_VARIABLE: '@' [a-zA-Z_][a-zA-Z0-9_]* ;
 
-// Assign operators
-ASSIGN_ADD: '+=';
-ASSIGN_MIN: '-=';
+// 7. Generic Identifiers (Keep this simple; don't put ' in here)
+IDENTIFIER: [a-zA-Z_#][a-zA-Z0-9_]* ;
+
 // Arithmetic operators
 PLUS: '+';
 MINUS: '-';
@@ -200,6 +231,7 @@ MULTIPLY: '*';
 DIVIDE: '/';
 
 // Symbols
+DOT: '.';
 COMMA: ',';
 SEMICOLON: ';';
 EQUALS: '=';
@@ -213,30 +245,10 @@ RIGHT_PAREN: ')';
 LEFT_BRACKET: '[';
 RIGHT_BRACKET: ']';
 
-// Identifiers must start with at least one character
-IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]* ;
-
-// User Variables - start with @
-USER_VARIABLE: '@' [a-zA-Z_][a-zA-Z0-9_]*;
-
 // System Variables - start with @@
 SYSTEM_VARIABLE: '@@' [a-zA-Z_][a-zA-Z0-9_]*;
-
 //Literals
 // Numbers
-INTEGER: [0-9]+;
-FLOAT: [0-9]+ '.' [0-9]+;
-
-// Strings
-// Single Quote String - '...'
-SINGLE_QUOTE_STRING: '\'' (~'\'' | '\'\'')* '\''
-// Replace ''  with  ' and \\n with (space)
-    { 
-        text = self.text
-        text= text.replace("''",  "'")
-        text= text.replace("\\\n",  " ")
-        self.text = text
-    };
 
 // Double Quote String - "..."
 DOUBLE_QUOTE_STRING: '"' (~'"' | '""')* '"'
@@ -250,8 +262,8 @@ DOUBLE_QUOTE_STRING: '"' (~'"' | '""')* '"'
 
 // Hex String - 0x... or X'...'
 //'\\\n' for it take the \\n for us to replace it. cuz it doesn't even read it
-HEX_STRING: 'X\'' [0-9A-Fa-f]+ '\'' | '0x' [0-9A-Fa-f]+  '\\\n'  [0-9A-Fa-f]+
-
+// it works but the newline is taking \r\n instread of just \n.
+HEX_STRING: 'X\'' [0-9A-Fa-f]+ '\'' | '0'[xX] ( [0-9A-Fa-f] | '\\\n' )+
     {
         text = self.text
         text = text.replace("\\\n", "")
@@ -259,21 +271,23 @@ HEX_STRING: 'X\'' [0-9A-Fa-f]+ '\'' | '0x' [0-9A-Fa-f]+  '\\\n'  [0-9A-Fa-f]+
     };
 
 // Bit String - b'...' or B'...' or 0b...
-BIT_STRING: [bB] '\'' [01]+ '\'' | '0b' [01]+  '\\\n' [01]+ 
+BIT_STRING: [bB] '\'' [01]+ '\'' | '0'[bB] [01]+  '\\\n' [01]+ 
     {
         text = self.text
         text = text.replace("\\\n", "")
         self.text = text
     };
+// HEX_STRING: 'X\'' [0-9A-Fa-f]+ '\'' | '0x' ( [0-9A-Fa-f] | '\\\n' )+
 
 // Comments fragment
+INTGER: [0-9]+;
+FLOAT: [0-9]+ '.' [0-9]+;
 // Single Line Comment - -- or //
-SINGLE_LINE_COMMENT: ('--' | '//') ~[\r\n]* ;
+SINGLE_LINE_COMMENT: ('--' | '//') ~[\r\n]* -> skip;
 
-//Nested Multi Line Comment - /* ... */
-//? Nesting uses Recursion
+// 8. Fix the Comment Rule (Use a non-greedy match that includes newlines)
 NESTED_BLOCK_COMMENT
-    : '/*' ( NESTED_BLOCK_COMMENT | . )*? '*/'
+    : '/*' ( NESTED_BLOCK_COMMENT | . | [\r\n] )*? '*/' -> skip
     ;
 
 // Whitespace - skip
