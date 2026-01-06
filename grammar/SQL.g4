@@ -218,6 +218,7 @@ INT: 'INT';
 BIGINT: 'BIGINT';
 NVARCHAR: 'NVARCHAR';
 SUM: 'SUM';
+TIES: 'TIES';
 // 6. Variables
 USER_VARIABLE: '@' [a-zA-Z_][a-zA-Z0-9_]* ;
 

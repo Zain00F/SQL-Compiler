@@ -16,11 +16,12 @@ selectStatement:
     (WITH)? //TODO
     SELECT 
     (distinctClause)? 
-    (TOP)? // TODO
+    (TOP expression PERCENT?
+    (WITH TIES)?)? // TODO
     columnList 
     (INTO columnName)? //TODO
     (FROM tableName)? 
-    (joinClause)? 
+    (joinClause)* 
     (WHERE expression)?
     (GROUP BY columnList)?
     (HAVING expression)?
@@ -30,7 +31,7 @@ selectStatement:
     SEMICOLON?;
 
 columnList: column (COMMA column)* ;  // * or list of columns
-column: (columnName | sumColumn) (asAlias|assignAlias)?;  // column AS alias (alias is optional)
+column: (columnName | sumColumn | expression) (asAlias|assignAlias)?;  // column AS alias (alias is optional)
 columnName: (alias | MULTIPLY)  (DOT IDENTIFIER)* (DOT MULTIPLY)?;
 
 assignAlias: EQUALS expression;
