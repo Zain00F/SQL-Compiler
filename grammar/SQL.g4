@@ -219,6 +219,8 @@ BIGINT: 'BIGINT';
 NVARCHAR: 'NVARCHAR';
 SUM: 'SUM';
 TIES: 'TIES';
+YEAR: 'YEAR';
+COUNT: 'COUNT';
 // 6. Variables
 USER_VARIABLE: '@' [a-zA-Z_][a-zA-Z0-9_]* ;
 

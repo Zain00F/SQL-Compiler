@@ -1,14 +1,17 @@
-SELECT TOP (10) PERCENT WITH TIES pp.FirstName,
-                                  pp.LastName,
-                                  e.JobTitle,
-                                  e.Gender
-                                  
-                                  FROM Person.Person AS pp
-     INNER JOIN HumanResources.Employee AS e
-         ON pp.BusinessEntityID = e.BusinessEntityID
-     INNER JOIN HumanResources.EmployeePayHistory AS r
-         ON r.BusinessEntityID = e.BusinessEntityID
-ORDER BY Rate DESC;
+WITH DirectReports (ManagerID, EmployeeID, Title, EmployeeLevel) AS
+(
+    SELECT ManagerID, EmployeeID, Title, 0 AS EmployeeLevel
+    FROM dbo.MyEmployees
+    WHERE ManagerID IS NULL
+    UNION ALL
+    SELECT e.ManagerID, e.EmployeeID, e.Title, EmployeeLevel + 1
+    FROM dbo.MyEmployees AS e
+         INNER JOIN DirectReports AS d
+             ON e.ManagerID = d.EmployeeID
+)
+SELECT ManagerID, EmployeeID, Title, EmployeeLevel
+FROM DirectReports
+ORDER BY ManagerID;
 
 -- -- ============================================
 -- -- PARSER TESTS - Testing currently supported features

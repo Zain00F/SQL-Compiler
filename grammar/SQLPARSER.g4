@@ -9,15 +9,16 @@ sqlStatement: selectStatement
             | insertStatement
             | updateStatement
             | deleteStatement
+            | unifiers
             | SEMICOLON;
 
 //ANCHOR SELECET STATEMENT
 selectStatement: 
-    (WITH)? //TODO
+    (WITH withExpression (COMMA withExpression)*)? //TODO
     SELECT 
     (distinctClause)? 
     (TOP expression PERCENT?
-    (WITH TIES)?)? // TODO
+    (WITH TIES)?)?
     columnList 
     (INTO columnName)? //TODO
     (FROM tableName)? 
@@ -41,7 +42,7 @@ alias: IDENTIFIER | SINGLE_QUOTE_STRING | DOUBLE_QUOTE_STRING;
 
 tableName: IDENTIFIER (DOT IDENTIFIER)* (asAlias)?;  // schema.table or just table
 
-sumColumn: SUM LEFT_PAREN IDENTIFIER RIGHT_PAREN; 
+sumColumn: (SUM | YEAR | COUNT) LEFT_PAREN IDENTIFIER RIGHT_PAREN; 
 // DISTINCT
 distinctClause: DISTINCT | ALL;
 
@@ -54,7 +55,7 @@ comparisonExpression: additiveExpression
                     ( (EQUALS | NOT_EQUAL | GREATER_THAN | LESS_THAN | GREATER_EQUAL | LESS_EQUAL) additiveExpression )?
                     | additiveExpression IN LEFT_PAREN valueList RIGHT_PAREN
                     | additiveExpression LIKE SINGLE_QUOTE_STRING
-                    | additiveExpression IS NULL
+                    | additiveExpression IS NOT? NULL
                     ;
 additiveExpression: multiplicativeExpression ((PLUS | MINUS) multiplicativeExpression)*;
 multiplicativeExpression: primaryExpression ((MULTIPLY | DIVIDE) primaryExpression)*;
@@ -75,6 +76,12 @@ orderByItem: columnName (ASC | DESC)?;
 tableSource: tableName (AS? alias)? (joinClause)*;
 joinClause: (INNER | LEFT | RIGHT | FULL | CROSS)? JOIN columnList ON expression;
 
+withExpression: IDENTIFIER LEFT_PAREN columnList RIGHT_PAREN AS (cteQuery)?;
+cteQuery:LEFT_PAREN ((unifiers)? selectStatement)* RIGHT_PAREN;
+unifiers: (UNION ALL
+        | INTERSECT
+        | UNION
+        | EXCEPT);
 
 //ANCHOR - INSERT STATEMENT
 insertStatement: INSERT INTO tableName 
