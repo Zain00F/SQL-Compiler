@@ -1,17 +1,21 @@
-WITH DirectReports (ManagerID, EmployeeID, Title, EmployeeLevel) AS
-(
-    SELECT ManagerID, EmployeeID, Title, 0 AS EmployeeLevel
-    FROM dbo.MyEmployees
-    WHERE ManagerID IS NULL
-    UNION ALL
-    SELECT e.ManagerID, e.EmployeeID, e.Title, EmployeeLevel + 1
-    FROM dbo.MyEmployees AS e
-         INNER JOIN DirectReports AS d
-             ON e.ManagerID = d.EmployeeID
-)
-SELECT ManagerID, EmployeeID, Title, EmployeeLevel
-FROM DirectReports
-ORDER BY ManagerID;
+-- RAW mode with custom element name
+SELECT BusinessEntityID, JobTitle FROM HumanResources.Employee FOR XML RAW('EmployeeRecord');
+
+-- AUTO mode with TYPE and XMLSCHEMA
+SELECT BusinessEntityID, FirstName FROM Person.Person FOR XML AUTO, TYPE, XMLSCHEMA;
+
+-- PATH mode with an empty element name (no row wrapper)
+SELECT Name, ProductNumber FROM Production.Product FOR XML PATH('');
+
+-- PATH mode with ROOT and ELEMENTS (Element-centric XML)
+SELECT TOP 5 Name, Color FROM Production.Product FOR XML PATH('Product'), ROOT('Catalog'), ELEMENTS;
+
+-- XSINIL and ABSENT (Requires ELEMENTS)
+SELECT Name, Color FROM Production.Product FOR XML PATH, ELEMENTS XSINIL;
+SELECT Name, Color FROM Production.Product FOR XML PATH, ELEMENTS ABSENT;
+
+-- BINARY BASE64 and XMLDATA (Deprecated but still in syntax)
+SELECT Name, LargePhoto FROM Production.ProductPhoto FOR XML AUTO, BINARY BASE64, XMLDATA;
 
 -- -- ============================================
 -- -- PARSER TESTS - Testing currently supported features

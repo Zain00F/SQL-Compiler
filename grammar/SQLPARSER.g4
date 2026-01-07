@@ -14,20 +14,20 @@ sqlStatement: selectStatement
 
 //ANCHOR SELECET STATEMENT
 selectStatement: 
-    (WITH withExpression (COMMA withExpression)*)? //TODO
+    (WITH withExpression (COMMA withExpression)*)?
     SELECT 
     (distinctClause)? 
     (TOP expression PERCENT?
     (WITH TIES)?)?
     columnList 
-    (INTO columnName)? //TODO
+    (INTO columnName)?
     (FROM tableName)? 
     (joinClause)* 
     (WHERE expression)?
     (GROUP BY columnList)?
     (HAVING expression)?
     (ORDER BY orderByList)?
-    (FOR)? //TODO
+    (FOR forClause)? //TODO
     (OPTION)? //TODO
     SEMICOLON?;
 
@@ -37,7 +37,7 @@ columnName: (alias | MULTIPLY)  (DOT IDENTIFIER)* (DOT MULTIPLY)?;
 
 assignAlias: EQUALS expression;
 asAlias: AS? alias;  // table.column or just column
-alias: IDENTIFIER | SINGLE_QUOTE_STRING | DOUBLE_QUOTE_STRING;
+alias: IDENTIFIER | SINGLE_QUOTE_STRING | DOUBLE_QUOTE_STRING | BRACKET_IDENTIFIER;
 // tableName
 
 tableName: IDENTIFIER (DOT IDENTIFIER)* (asAlias)?;  // schema.table or just table
@@ -83,6 +83,28 @@ unifiers: (UNION ALL
         | UNION
         | EXCEPT);
 
+forClause
+    : jsonClause | xmlClause | BROWSE;
+jsonClause
+    : JSON (AUTO | PATH) 
+      (COMMA jsonOption)* ;
+jsonOption
+    : ROOT LEFT_PAREN alias RIGHT_PAREN
+    | INCLUDENULLVALUES
+    | WITHOUTARRAYWRAPPER
+    ;
+xmlClause
+    : XML (RAW | AUTO | EXPLICIT | PATH) (LEFT_PAREN alias RIGHT_PAREN)?
+      (COMMA xmlOption)*
+    ;
+xmlOption
+    : ELEMENTS (XSINIL | ABSENT)?
+    | ROOT LEFT_PAREN alias RIGHT_PAREN
+    | TYPE
+    | XMLDATA
+    | XMLSCHEMA (LEFT_PAREN alias RIGHT_PAREN)?
+    | BINARY BASE64
+    ;
 //ANCHOR - INSERT STATEMENT
 insertStatement: INSERT INTO tableName 
                  (LEFT_PAREN columnList RIGHT_PAREN)?
