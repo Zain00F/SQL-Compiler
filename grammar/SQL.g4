@@ -18,6 +18,9 @@ UNICODE_STRING: [nN] '\'' ( ~'\'' | '\'\'')* '\''
 ASSIGN_ADD: '+=';
 ASSIGN_MIN: '-=';
 ASSIGN_MUL: '*=';
+ASSIGN_DIV: '/=';
+NOT_GREATER_THAN: '!>';
+NOT_LESS_THAN: '!<';
 
 // 4. Standard Strings
 SINGLE_QUOTE_STRING: '\'' (~'\'' | '\'\'')* '\''

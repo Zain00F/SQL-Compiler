@@ -32,7 +32,7 @@ selectStatement:
     (INTO columnName)?//todo
     (FROM tableName)? 
     (joinClause)* 
-    (WHERE expression)?
+    (WHERE whereExpression)?
     (GROUP BY columnList)?
     (HAVING expression)?
     (ORDER BY orderByList)?
@@ -56,7 +56,7 @@ updateStatement:
     SET assignmentList
     (FROM tableName)?
     (joinClause)*  
-    (WHERE expression)?
+    (WHERE whereExpression)?
     (OPTION optionClause)? 
     SEMICOLON?;
 
@@ -64,7 +64,7 @@ updateStatement:
 deleteStatement: DELETE FROM tableName (WHERE expression)? SEMICOLON?;
 
 // ======================================================
-// 3. CLAUSE DEFINITIONS (SELECT Components)
+// 3. CLAUSE DEFINITIONS
 // ======================================================
 
 distinctClause: DISTINCT | ALL;
@@ -85,7 +85,7 @@ orderByList: orderByItem (COMMA orderByItem)*;
 
 orderByItem: columnName (ASC | DESC)?;
 
-withExpression: IDENTIFIER LEFT_PAREN columnList RIGHT_PAREN AS (cteQuery)?;
+withExpression: IDENTIFIER (LEFT_PAREN columnList RIGHT_PAREN)? AS (cteQuery)?;
 
 cteQuery: LEFT_PAREN ((unifiers)? selectStatement)* RIGHT_PAREN;
 
@@ -212,9 +212,18 @@ labelHint
 temporalHint
     : FOR TIMESTAMP AS OF SINGLE_QUOTE_STRING
     ;
+    
+// ======================================================
+// 7. WHERE CLAUSE SUB-RULES
+// ======================================================
+whereExpression: 
+    expression |
+    whereCte cteQuery   ;
+whereCte: (EXISTS | IDENTIFIER IN);
+
 
 // ======================================================
-// 7. UPDATE/INSERT SHARED SUB-RULES
+// 8. UPDATE/INSERT SHARED SUB-RULES
 // ======================================================
 
 assignmentList: assignment (COMMA assignment)*;
@@ -226,7 +235,7 @@ assignment: columnName EQUALS expression
           ;
 
 // ======================================================
-// 8. EXPRESSIONS AND LITERALS
+// 9. EXPRESSIONS AND LITERALS
 // ======================================================
 
 expression: orExpression;
@@ -238,8 +247,8 @@ andExpression: notExpression (AND notExpression)*;
 notExpression: NOT notExpression | comparisonExpression;
 
 comparisonExpression: additiveExpression 
-                    ( (EQUALS | NOT_EQUAL | GREATER_THAN | LESS_THAN | GREATER_EQUAL | LESS_EQUAL) additiveExpression )?
-                    | additiveExpression NOT? IN LEFT_PAREN valueList RIGHT_PAREN
+                    ( (EQUALS | NOT_EQUAL | GREATER_THAN | LESS_THAN | GREATER_EQUAL | LESS_EQUAL| NOT_GREATER_THAN | NOT_LESS_THAN) additiveExpression )?
+                    | additiveExpression NOT? IN LEFT_PAREN (valueList) RIGHT_PAREN
                     | additiveExpression LIKE SINGLE_QUOTE_STRING
                     | additiveExpression IS NOT? NULL
                     ;
@@ -261,7 +270,7 @@ literal: INTGER | FLOAT | SINGLE_QUOTE_STRING | DOUBLE_QUOTE_STRING | NULL | TRU
 valueList: literal (COMMA literal)*;
 
 // ======================================================
-// 9. CORE ATOMS AND ALIASES
+// 10. CORE ATOMS AND ALIASES
 // ======================================================
 
 sumColumn: (SUM | YEAR | COUNT | AVG) LEFT_PAREN IDENTIFIER RIGHT_PAREN; 
