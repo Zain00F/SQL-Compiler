@@ -17,11 +17,14 @@ sqlStatement: selectStatement
             | alterStatement
             | dropStatement
             | unifiers
+            | goStatement
             | SEMICOLON;
 
 // ======================================================
 // 2. MAIN STATEMENTS
 // ======================================================
+goStatement: GO SEMICOLON?;
+
 
 // --- SELECT STATEMENT ---
 selectStatement: 
@@ -69,6 +72,18 @@ deleteStatement: DELETE FROM tableName (WHERE expression)? SEMICOLON?;
 // ======================================================
 // 3. DDL STATEMENTS
 // ======================================================
+truncateStatement: 
+    TRUNCATE TABLE 
+    tableName 
+    (WITH LEFT_PAREN PARTITIONS LEFT_PAREN partitionRange (COMMA partitionRange)* RIGHT_PAREN RIGHT_PAREN)?
+    SEMICOLON?
+    ;
+
+partitionRange: 
+    expression 
+    (TO expression)?
+    ;
+
 dropStatement: 
     DROP TABLE 
     (IF EXISTS)? 
@@ -349,12 +364,18 @@ multiplicativeExpression: primaryExpression ((MULTIPLY | DIVIDE) primaryExpressi
 
 primaryExpression: literal
                  | columnName
+                 | scalarFunction
                  | USER_VARIABLE
                  | SYSTEM_VARIABLE
                  | LEFT_PAREN expression RIGHT_PAREN
                  | LEFT_PAREN selectStatement RIGHT_PAREN
                  | sumColumn
                  ;
+
+// For functions like CONCAT that take multiple expressions
+scalarFunction
+    : IDENTIFIER LEFT_PAREN (expression (COMMA expression)*)? RIGHT_PAREN
+    ;
 
 literal: INTGER | FLOAT | SINGLE_QUOTE_STRING | DOUBLE_QUOTE_STRING | NULL | TRUE | FALSE;
 
@@ -367,7 +388,7 @@ identifier:
     IDENTIFIER
     | BRACKET_IDENTIFIER;
 
-sumColumn: (SUM | YEAR | COUNT | AVG| MAX) LEFT_PAREN IDENTIFIER RIGHT_PAREN; 
+sumColumn: (SUM | YEAR | COUNT | AVG | MAX) LEFT_PAREN expression RIGHT_PAREN; 
 
 assignAlias: EQUALS expression;
 
