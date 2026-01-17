@@ -14,6 +14,8 @@ sqlStatement: selectStatement
             | insertStatement
             | updateStatement
             | deleteStatement
+            | alterStatement
+            | dropStatement
             | unifiers
             | SEMICOLON;
 
@@ -63,6 +65,92 @@ updateStatement:
 // --- DELETE STATEMENT ---
 deleteStatement: DELETE FROM tableName (WHERE expression)? SEMICOLON?;
 
+
+// ======================================================
+// 3. DDL STATEMENTS
+// ======================================================
+dropStatement: 
+    DROP TABLE 
+    (IF EXISTS)? 
+    tableName 
+    (COMMA tableName)*
+    SEMICOLON?
+    ;
+// ----
+alterStatement: 
+    ALTER TABLE tableName 
+    alterAction (COMMA alterAction)*
+    SEMICOLON?
+    ;
+
+alterAction:
+    addColumnAction
+    | dropColumnAction
+    | alterColumnAction
+    | addConstraintAction
+    | dropConstraintAction
+    ;
+
+// --- Core Actions ---
+
+addColumnAction
+    : ADD columnDefinition (COMMA columnDefinition)*
+    ;
+
+dropColumnAction
+    : DROP COLUMN columnName
+    ;
+
+alterColumnAction
+    : ALTER COLUMN columnName dataType (nullability)?
+    ;
+
+addConstraintAction
+    : ADD (CONSTRAINT IDENTIFIER)? constraintDefinition
+    ;
+
+dropConstraintAction
+    : DROP CONSTRAINT IDENTIFIER
+    ;
+
+// --- Supporting Rules ---
+
+columnDefinition
+    : columnName dataType (nullability)? (constraintDefinition)?
+    ;
+
+constraintDefinition
+    : primaryKeyConstraint
+    | foreignKeyConstraint
+    | uniqueConstraint
+    | checkConstraint
+    ;
+
+primaryKeyConstraint
+    : PRIMARY KEY (CLUSTERED | NONCLUSTERED)? 
+      LEFT_PAREN columnName (COMMA columnName)* RIGHT_PAREN
+    ;
+
+foreignKeyConstraint
+    : FOREIGN KEY LEFT_PAREN columnName (COMMA columnName)* RIGHT_PAREN 
+      REFERENCES tableName LEFT_PAREN columnName (COMMA columnName)* RIGHT_PAREN
+    ;
+
+uniqueConstraint
+    : UNIQUE (CLUSTERED | NONCLUSTERED)? 
+      LEFT_PAREN columnName (COMMA columnName)* RIGHT_PAREN
+    ;
+
+checkConstraint
+    : CHECK LEFT_PAREN expression RIGHT_PAREN
+    ;
+dataType
+    : IDENTIFIER (LEFT_PAREN (INTGER | MAX) RIGHT_PAREN)? 
+    ;
+
+nullability
+    : NOT? NULL
+    ;
 // ======================================================
 // 3. CLAUSE DEFINITIONS
 // ======================================================
@@ -75,7 +163,7 @@ column: (columnName | sumColumn | expression) (asAlias|assignAlias)?;
 
 columnName: (alias | MULTIPLY) (DOT IDENTIFIER)* (DOT MULTIPLY)?;
 
-tableName: IDENTIFIER (DOT IDENTIFIER)* (asAlias)?;
+tableName: identifier (DOT identifier)* (asAlias)?;
 
 tableSource: tableName (AS? alias)? (joinClause)*;
 
@@ -217,8 +305,7 @@ temporalHint
 // 7. WHERE CLAUSE SUB-RULES
 // ======================================================
 whereExpression: 
-    expression |
-    whereCte cteQuery   ;
+    expression ;
 whereCte: (EXISTS | IDENTIFIER IN);
 
 
@@ -251,6 +338,7 @@ comparisonExpression: additiveExpression
                     | additiveExpression NOT? IN LEFT_PAREN (valueList) RIGHT_PAREN
                     | additiveExpression LIKE SINGLE_QUOTE_STRING
                     | additiveExpression IS NOT? NULL
+                    | whereCte LEFT_PAREN selectStatement RIGHT_PAREN
                     ;
 
 additiveExpression: multiplicativeExpression ((PLUS | MINUS) multiplicativeExpression)*;
@@ -262,6 +350,7 @@ primaryExpression: literal
                  | USER_VARIABLE
                  | SYSTEM_VARIABLE
                  | LEFT_PAREN expression RIGHT_PAREN
+                 | LEFT_PAREN selectStatement RIGHT_PAREN
                  | sumColumn
                  ;
 
@@ -272,8 +361,11 @@ valueList: literal (COMMA literal)*;
 // ======================================================
 // 10. CORE ATOMS AND ALIASES
 // ======================================================
+identifier: 
+    IDENTIFIER
+    | BRACKET_IDENTIFIER;
 
-sumColumn: (SUM | YEAR | COUNT | AVG) LEFT_PAREN IDENTIFIER RIGHT_PAREN; 
+sumColumn: (SUM | YEAR | COUNT | AVG| MAX) LEFT_PAREN IDENTIFIER RIGHT_PAREN; 
 
 assignAlias: EQUALS expression;
 
