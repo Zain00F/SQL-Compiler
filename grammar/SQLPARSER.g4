@@ -334,11 +334,13 @@ andExpression: notExpression (AND notExpression)*;
 notExpression: NOT notExpression | comparisonExpression;
 
 comparisonExpression: additiveExpression 
-                    ( (EQUALS | NOT_EQUAL | GREATER_THAN | LESS_THAN | GREATER_EQUAL | LESS_EQUAL| NOT_GREATER_THAN | NOT_LESS_THAN) additiveExpression )?
-                    | additiveExpression NOT? IN LEFT_PAREN (valueList) RIGHT_PAREN
-                    | additiveExpression LIKE SINGLE_QUOTE_STRING
-                    | additiveExpression IS NOT? NULL
-                    | whereCte LEFT_PAREN selectStatement RIGHT_PAREN
+                    ( (EQUALS | NOT_EQUAL | GREATER_THAN | LESS_THAN | GREATER_EQUAL | LESS_EQUAL| NOT_GREATER_THAN | NOT_LESS_THAN) additiveExpression 
+                    | NOT? IN LEFT_PAREN (valueList) RIGHT_PAREN
+                    | LIKE SINGLE_QUOTE_STRING
+                    // 2. BETWEEN Operator (Add this)
+                    | NOT? BETWEEN additiveExpression AND additiveExpression 
+                    | IS NOT? NULL)*
+                    | whereCte LEFT_PAREN (selectStatement | valueList) RIGHT_PAREN
                     ;
 
 additiveExpression: multiplicativeExpression ((PLUS | MINUS) multiplicativeExpression)*;

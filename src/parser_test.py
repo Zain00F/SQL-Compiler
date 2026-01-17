@@ -5,9 +5,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from antlr4 import *
 from SQL import SQL  
 from SQLPARSER import SQLPARSER  
-
+from lexer_test import CaseInsensitiveStream
 def test_parser(sql_text, show_tree=True, show_tokens=False):
-    input_stream = InputStream(sql_text)
+    raw_stream = InputStream(sql_text)
+    
+    input_stream = CaseInsensitiveStream(raw_stream)
     
     lexer = SQL(input_stream)
     token_stream = CommonTokenStream(lexer)
