@@ -132,6 +132,7 @@ SELECT * from EmployeeMaster WHERE employeename LIKE 'sup%'
 
 SELECT * from EmployeeMaster WHERE employeename LIKE '%man'
 
+
 SELECT * from EmployeeMaster WHERE employeename NOT LIKE '%ra%'
 
 /*will return 8 letter names starting with Su, containing p or j in between and ending in erman*/

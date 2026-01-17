@@ -182,7 +182,7 @@ tableName: identifier (DOT identifier)* (asAlias)?;
 
 tableSource: tableName (AS? alias)? (joinClause)*;
 
-joinClause: (INNER | LEFT | RIGHT | FULL | CROSS)? JOIN columnList ON expression;
+joinClause: (INNER | OUTER | LEFT | RIGHT | FULL | CROSS)* JOIN columnList ON expression;
 
 orderByList: orderByItem (COMMA orderByItem)*;
 
@@ -351,7 +351,7 @@ notExpression: NOT notExpression | comparisonExpression;
 comparisonExpression: additiveExpression 
                     ( (EQUALS | NOT_EQUAL | GREATER_THAN | LESS_THAN | GREATER_EQUAL | LESS_EQUAL| NOT_GREATER_THAN | NOT_LESS_THAN) additiveExpression 
                     | NOT? IN LEFT_PAREN (valueList) RIGHT_PAREN
-                    | LIKE SINGLE_QUOTE_STRING
+                    | NOT? LIKE SINGLE_QUOTE_STRING
                     // 2. BETWEEN Operator (Add this)
                     | NOT? BETWEEN additiveExpression AND additiveExpression 
                     | IS NOT? NULL)*
