@@ -14,10 +14,14 @@ sqlStatement: selectStatement
             | insertStatement
             | updateStatement
             | deleteStatement
+            | createStatement
             | alterStatement
             | dropStatement
+            | ifStatement        
+            | beginEndBlock
             | unifiers
             | goStatement
+            | truncateStatement
             | SEMICOLON;
 
 // ======================================================
@@ -46,11 +50,25 @@ selectStatement:
     SEMICOLON?;
 
 // --- INSERT STATEMENT ---
-insertStatement: INSERT INTO tableName 
-                 (LEFT_PAREN columnList RIGHT_PAREN)?
-                 VALUES LEFT_PAREN valueList RIGHT_PAREN
-                 SEMICOLON?;
-                 
+insertStatement: INSERT
+      (topClause)?
+      INTO tableName
+      (LEFT_PAREN columnList RIGHT_PAREN)?
+      insertSource
+      SEMICOLON?
+    ;
+insertSource
+    : DEFAULT VALUES
+    | VALUES insertValueList
+    | selectStatement
+    ;
+insertValueList
+    : LEFT_PAREN expressionList RIGHT_PAREN
+      (COMMA LEFT_PAREN expressionList RIGHT_PAREN)*
+    ;
+expressionList
+    : expression (COMMA expression)*
+    ;                 
 // --- UPDATE STATEMENT ---
 updateStatement: 
     (WITH withExpression (COMMA withExpression)*)?
@@ -66,12 +84,99 @@ updateStatement:
     SEMICOLON?;
 
 // --- DELETE STATEMENT ---
-deleteStatement: DELETE FROM tableName (WHERE expression)? SEMICOLON?;
+deleteStatement
+    : DELETE
+      (topClause)?
+      (deleteTarget)?
+      (
+          FROM tableSource
+        | tableSource
+      )
+      (WHERE expression)?
+      SEMICOLON?
+    ;
+topClause
+    : TOP topValue
+    ;
+
+topValue
+    : INTGER
+    | LEFT_PAREN expression RIGHT_PAREN
+    ;    
+deleteTarget
+    : IDENTIFIER
+    ;
 
 
 // ======================================================
 // 3. DDL STATEMENTS
 // ======================================================
+createStatement
+    : createView SEMICOLON?
+    | CREATE createObject SEMICOLON?
+    ;
+createObject
+    : createTable
+    | createDatabase
+    | createIndex
+    ;
+createDatabase
+    : DATABASE databaseName
+    ;
+
+databaseName
+    : IDENTIFIER
+    ;
+createTable
+    : TABLE tableName
+      LEFT_PAREN tableElementList RIGHT_PAREN
+    | TABLE tableName
+      AS selectStatement
+    ;
+tableElementList
+    : tableElement (COMMA tableElement)*
+    ;
+
+tableElement
+    : columnDefinition
+    | tableConstraint
+    ;
+tableConstraint
+    : (CONSTRAINT constraintName)?
+      primaryKeyConstraint
+    | (CONSTRAINT constraintName)?
+      uniqueConstraint
+    | (CONSTRAINT constraintName)?
+      foreignKeyConstraint
+    | checkConstraint
+    ;
+constraintName
+    : IDENTIFIER
+    ;    
+createView
+    : (CREATE OR ALTER | CREATE)
+      VIEW viewName
+      AS selectStatement
+    ;
+viewName
+    : IDENTIFIER
+    ;
+createIndex
+    : (UNIQUE)?
+      INDEX indexName
+      ON tableName
+      LEFT_PAREN columnList RIGHT_PAREN
+      (includeClause)?
+      (WHERE expression)?
+    ;
+includeClause
+    : INCLUDE LEFT_PAREN columnList RIGHT_PAREN
+    ;
+
+indexName
+    : IDENTIFIER
+    ;
+
 truncateStatement: 
     TRUNCATE TABLE 
     tableName 
@@ -130,9 +235,26 @@ dropConstraintAction
 
 // --- Supporting Rules ---
 
-columnDefinition
-    : columnName dataType (nullability)? (constraintDefinition)?
+
+columnConstraint
+    : identityConstraint
+    | PRIMARY KEY
+    | UNIQUE
+    | NOT NULL
+    | NULL
+    | checkConstraint
     ;
+identityConstraint
+    : IDENTITY
+      (LEFT_PAREN INTGER COMMA INTGER RIGHT_PAREN)?
+    ;
+
+columnDefinition
+    : columnName dataType
+      (nullability)?
+      (columnConstraint)*
+    ;
+
 
 constraintDefinition
     : primaryKeyConstraint
@@ -160,9 +282,9 @@ checkConstraint
     : CHECK LEFT_PAREN expression RIGHT_PAREN
     ;
 dataType
-    : IDENTIFIER (LEFT_PAREN (INTGER | MAX) RIGHT_PAREN)? 
+    : (IDENTIFIER | INT | BIGINT | SMALLINT | FLOAT | DECIMAL | VARCHAR | NVARCHAR)
+      (LEFT_PAREN (INTGER | MAX) RIGHT_PAREN)?
     ;
-
 nullability
     : NOT? NULL
     ;
@@ -362,22 +484,37 @@ additiveExpression: multiplicativeExpression ((PLUS | MINUS) multiplicativeExpre
 
 multiplicativeExpression: primaryExpression ((MULTIPLY | DIVIDE) primaryExpression)*;
 
-primaryExpression: literal
+primaryExpression: signedLiteral  
+                 |literal
                  | columnName
                  | scalarFunction
                  | USER_VARIABLE
                  | SYSTEM_VARIABLE
+                 |existsExpression     
                  | LEFT_PAREN expression RIGHT_PAREN
                  | LEFT_PAREN selectStatement RIGHT_PAREN
                  | sumColumn
                  ;
 
+
+existsExpression
+    : NOT? EXISTS LEFT_PAREN selectStatement RIGHT_PAREN
+    ;
+
 // For functions like CONCAT that take multiple expressions
+
 scalarFunction
-    : IDENTIFIER LEFT_PAREN (expression (COMMA expression)*)? RIGHT_PAREN
+    : (IDENTIFIER | CONCAT)
+      LEFT_PAREN (expression (COMMA expression)*)? RIGHT_PAREN
     ;
 
 literal: INTGER | FLOAT | SINGLE_QUOTE_STRING | DOUBLE_QUOTE_STRING | NULL | TRUE | FALSE;
+
+signedLiteral
+    : MINUS literal
+    | literal
+    ;
+
 
 valueList: literal (COMMA literal)*;
 
@@ -395,3 +532,39 @@ assignAlias: EQUALS expression;
 asAlias: AS? alias;
 
 alias: IDENTIFIER | SINGLE_QUOTE_STRING | DOUBLE_QUOTE_STRING | BRACKET_IDENTIFIER;
+
+
+
+
+
+// ======================================================
+// IF STATEMENT
+// ======================================================
+
+ifStatement
+    : IF expression sqlStatementOrBlock
+      (ELSE sqlStatementOrBlock)?
+    ;
+
+
+
+sqlStatementOrBlock
+    : sqlStatement
+    | beginEndBlock
+    ;
+
+beginEndBlock
+    : BEGIN (sqlStatement | SEMICOLON)* END
+    ;
+
+
+// بعد التعديل على ملف SQLPARSER شغل الاوامر
+// java -jar C:\antlr\antlr-4.13.1-complete.jar -Dlanguage=Python3 grammar/SQLPARSER.g4
+// java -jar C:\antlr\antlr-4.13.1-complete.jar -Dlanguage=Python3 -visitor  grammar/SQLPARSER.g4
+
+// للتنفيذ 
+//python src\parser_test.py
+
+//بعد التنفيذ استخدم الأوامر لعرض صور parse tree,ast tree
+//dot -Tpng parse_tree.dot -o parse_tree.png
+// dot -Tpng ast_tree_0.dot -o ast_tree_0.png

@@ -1,6 +1,7 @@
 # git add .gitignore src/* grammar/SQL.g4 grammar/SQLPARSER.g4
 *
 !src/
+!src/**
 !grammar/
 !grammar/*.g4
 !.gitignore
