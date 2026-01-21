@@ -20,21 +20,20 @@ class ASTComposite(ASTNode):
         for c in children:
             self.add(c)
 
-    def print(self, indent: str = "") -> None:
-        print(f"{indent}{self.__class__.__name__}")
-        child_indent = indent + "  "
-        for c in self.children:
-            c.print(child_indent)
+    def print(self, indent=0):
+        pad = "  " * indent
+        print(f"{pad}{self.__class__.__name__}")
+        for child in self.children:
+            child.print(indent + 1)
 
 
 @dataclass
 class ASTLeaf(ASTNode):
     text: str
-
-    def print(self, indent: str = "") -> None:
-        print(f"{indent}{self.__class__.__name__}")
-        print(f"{indent}  Text: {self.text}")
-
+    def print(self, indent=0) -> None:
+        pad = "  " * indent
+        print(f"{pad}{self.__class__.__name__}")
+        print(f"{pad}  Text: {self.text}")
 
 class SelectNode(ASTComposite):
     pass  
@@ -214,6 +213,11 @@ class BinaryDivExprNode(ExprNode):
 class BinaryMulExprNode(ExprNode):
     pass
 
+class SubqueryExprNode(ExprNode):
+    def __init__(self, select_node):
+        super().__init__()
+        self.select = select_node
+        self.children = [select_node]
 
 class BinaryComparisonExprNode(ExprNode):
     pass
@@ -223,28 +227,57 @@ class IsNullNode(ExprNode):
         super().__init__()
         self.add(expr)
         self.negated = negated
-
-    def __str__(self):
-        return "IS NOT NULL" if self.negated else "IS NULL"
+    def print(self, indent=0):
+        pad = "  " * indent
+        label = "IS NOT NULL" if self.negated else "IS NULL"
+        print(f"{pad}{label}")
+        for child in self.children:
+            child.print(indent + 1)
+        
     
 
-
-# تمثيل LIKE / NOT LIKE
+#  LIKE / NOT LIKE
 class LikeNode(ExprNode):
     def __init__(self, left, pattern, negated=False):
         super().__init__()
         self.negated = negated
         self.add(left)
         self.add(pattern)
+    def print(self, indent=0):
+        pad = "  " * indent
+        label = "NOT LIKE" if self.negated else "LIKE"
+        print(f"{pad}{label}")
+        for child in self.children:
+            child.print(indent + 1)
+        
+    
+
+class InExprNode(ExprNode):
+    def __init__(self, left, values, negated=False):
+        super().__init__()
+        self.add(left)
+        for v in values:
+            self.add(v)
+        self.negated = negated
 
 
-# تمثيل المقارنات الثنائية "!=" أو "<>"
+
 class BinaryNotEqualExprNode(BinaryComparisonExprNode):
     pass
 
     
 class EXISTS(ExprNode):
-    pass
+    def __init__(self, negated=False):
+        super().__init__()
+        self.negated = negated
+
+    def print(self, indent=0):
+        pad = "  " * indent
+        prefix = "NOT " if self.negated else ""
+        print(f"{pad}{prefix}EXISTS")
+        for child in self.children:
+            child.print(indent + 1)
+
 
 
 class BinaryNotEqualExprNode(BinaryComparisonExprNode):
@@ -277,6 +310,8 @@ class NumberLiteralNode(ASTLeaf):
 class StringLiteralNode(ASTLeaf):
     pass
 
+class LiteralNode(ASTLeaf):
+    pass
 
 class FunctionCallNode(ASTComposite):
     pass
@@ -301,3 +336,9 @@ class BlockNode(ASTComposite):
         print(f"{pad}BlockNode")
         for child in self.children:
             child.print(indent + 1)
+
+class UseNode(ASTComposite):
+    pass                        
+
+class TruncateNode(ASTComposite):
+    pass
