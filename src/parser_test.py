@@ -72,11 +72,12 @@ from parse_tree_exporter import ParseTreeGraphvizExporter
 
 
 def export_parse_tree_image(sql_text, dot_file="parse_tree.dot"):
-    input_stream = InputStream(sql_text)
+  
+    raw_stream = InputStream(sql_text)
+    input_stream = CaseInsensitiveStream(raw_stream) 
     lexer = SQL(input_stream)
     token_stream = CommonTokenStream(lexer)
     parser = SQLPARSER(token_stream)
-
     tree = parser.sqlScript()
 
     if parser.getNumberOfSyntaxErrors() > 0:
@@ -84,13 +85,12 @@ def export_parse_tree_image(sql_text, dot_file="parse_tree.dot"):
         return
 
     exporter = ParseTreeGraphvizExporter(parser)
-    exporter.export(tree, dot_file)
+    exporter.export(tree, dot_file)  
 
     builder = ASTBuilder()
     ast_list = builder.visit(tree)
 
     exporter = ASTGraphvizExporter()
-
     for i, ast in enumerate(ast_list):
         exporter.export(ast, f"ast_tree_{i}.dot")
 

@@ -2,7 +2,8 @@ from typing import List, Optional, Union
 
 from SQLPARSER import SQLPARSER
 from SQLPARSERVisitor import SQLPARSERVisitor
-from .semantic_ast import (
+from .semantic_ast import ( 
+    EXISTS,
     ASTNode,
     BinaryComparisonExprNode,
     BinaryNotEqualExprNode,
@@ -10,9 +11,12 @@ from .semantic_ast import (
     IfNode,
     IsNullNode,
     LikeNode,
+    LiteralNode,
     SelectNode,
     SelectSetQuantifierNode,
     InsertNode,
+    SubqueryExprNode,
+    TruncateNode,
     UpdateNode,
     DeleteNode,
     AlterTableNode,
@@ -22,6 +26,7 @@ from .semantic_ast import (
     TableIdentifierNode,
     ColumnIdentifierNode,
     ColumnListNode,
+    UseNode,
     ValueListNode,
     WhereNode,
     GroupByNode,
@@ -104,6 +109,10 @@ class ASTBuilder(SQLPARSERVisitor):
             return self.visit(ctx.beginEndBlock()) 
         if ctx.goStatement():
             return self.visit(ctx.goStatement())
+        if ctx.truncateStatement():
+            return self.visit(ctx.truncateStatement())
+        if ctx.useStatement():                   
+            return self.visit(ctx.useStatement())
         
         return None
 
@@ -118,7 +127,7 @@ class ASTBuilder(SQLPARSERVisitor):
             quant_text = ctx.distinctClause().getText()
             node.add(SelectSetQuantifierNode(text=quant_text))
 
-        # الأعمدة
+        # column
         if ctx.columnList():
             first_col_list_ctx = ctx.columnList(0)
             col_list_ast = self.visit(first_col_list_ctx)
@@ -208,54 +217,28 @@ class ASTBuilder(SQLPARSERVisitor):
 
     # ---------- INSERT ----------
 
-    def visitInsertStatement(self, ctx: SQLPARSER.InsertStatementContext) -> InsertNode:
-    
+    def visitInsertStatement(self, ctx):
         node = InsertNode()
 
-        # table
-        table_ast = self.visit(ctx.tableName())
-        node.add(table_ast)
-
-        # columns 
+        node.add(self.visit(ctx.tableName()))
         if ctx.columnList():
-            col_list_ast = self.visit(ctx.columnList())
-            if col_list_ast:
-                node.add(col_list_ast)
+            node.add(self.visit(ctx.columnList()))
 
-        # values → ValueListNode
-        values_ast = self._build_value_list_from_values_clause(ctx)
-        if values_ast:
-            node.add(values_ast)
+        src = ctx.insertSource()
+        if src:
+            src_ast = self.visit(src)
+            if src_ast:
+                node.add(src_ast)
 
         return node
 
-    def _build_value_list_from_values_clause(
-        self, ctx: SQLPARSER.InsertStatementContext
-    ) -> Optional[ValueListNode]:
-       
-        insert_source = ctx.insertSource()
-        if insert_source is None:
-            return None
-
-        result = self.visit(insert_source)
-        if isinstance(result, ValueListNode):
-            return result
-        return None
-
-    def visitInsertSource(
-        self, ctx: SQLPARSER.InsertSourceContext
-    ) -> Optional[ValueListNode]:
-        # DEFAULT VALUES
-        if ctx.DEFAULT() and ctx.VALUES():
-            return None
-
-        # VALUES insertValueList
-        if ctx.VALUES() and ctx.insertValueList():
+    def visitInsertSource(self, ctx):
+        if ctx.insertValueList():
             return self.visit(ctx.insertValueList())
-        
+
         if ctx.selectStatement():
             return self.visit(ctx.selectStatement())        
-
+            
 
         return None
 
@@ -392,24 +375,50 @@ class ASTBuilder(SQLPARSERVisitor):
             base.add(StringLiteralNode(text=alias_text))
 
         return base
-
+ 
     # ---------- Literals & Functions ----------
-
-    def visitLiteral(self, ctx: SQLPARSER.LiteralContext) -> ASTNode:
+    
+    def visitLiteral(self, ctx):
         text = ctx.getText()
 
-        if ctx.INTGER() or ctx.FLOAT():
-            return NumberLiteralNode(text=text)
+        # NULL
+        if ctx.NULL():
+            return LiteralNode(text="NULL")
 
-        if (
-            ctx.SINGLE_QUOTE_STRING()
-            or ctx.DOUBLE_QUOTE_STRING()
-            or ctx.unicodeString()
-        ):
-            return StringLiteralNode(text=text)
+        # Integer 
+        if ctx.INTGER():
+            return NumberLiteralNode(int(text))
 
-        
-        return StringLiteralNode(text=text)
+        # Float 
+        if ctx.FLOAT():
+            return NumberLiteralNode(float(text))
+
+        # String literal: 'TEXT'
+        if ctx.SINGLE_QUOTE_STRING():
+            raw = ctx.SINGLE_QUOTE_STRING().getText()
+            return StringLiteralNode(text=text) 
+
+        # Identifier literal 
+        if ctx.IDENTIFIER():
+            return LiteralNode(text)
+
+        # Fallback
+        return LiteralNode(text)
+
+    def visitSignedLiteral(self, ctx):
+        node = self.visit(ctx.literal())
+
+        if ctx.MINUS():
+            if isinstance(node, NumberLiteralNode):
+                node.text = -node.text
+            else:
+                node.text = "-" + str(node.text)
+
+        return node
+
+
+    
+
 
     # ---------- Expressions (AND / OR / Comparisons) ----------
 
@@ -450,7 +459,7 @@ class ASTBuilder(SQLPARSERVisitor):
 
         children = list(ctx.getChildren())
         expr: Optional[ExprNode] = None
-        pending_op: Optional[str] = None  # "+" أو "-"
+        pending_op: Optional[str] = None  
 
         for ch in children:
             # كل multiplicativeExpression
@@ -489,7 +498,7 @@ class ASTBuilder(SQLPARSERVisitor):
 
         children = list(ctx.getChildren())
         expr: Optional[ExprNode] = None
-        pending_op: Optional[str] = None  # "*" أو "/"
+        pending_op: Optional[str] = None  
 
         for ch in children:
             if isinstance(ch, SQLPARSER.PrimaryExpressionContext):
@@ -524,54 +533,64 @@ class ASTBuilder(SQLPARSERVisitor):
     def visitComparisonExpression(
         self, ctx: SQLPARSER.ComparisonExpressionContext
     ) -> ExprNode:
+        
 
-        # ---------- IS NULL / IS NOT NULL ----------
         if ctx.IS() and ctx.NULL():
             left_expr = self.visit(ctx.additiveExpression(0))
-            negated = ctx.NOT() is not None
-            return IsNullNode(left_expr, negated=negated)
+            
+            is_negated = bool(ctx.NOT())  
+            return IsNullNode(left_expr, negated=is_negated)
+
+       
 
         # ---------- IN / NOT IN ----------
+        # if ctx.IN():
+        #     left = self.visit(ctx.additiveExpression(0))
+
+        #     vlist_ctx = ctx.valueList(0) if ctx.valueList() else None
+        #     vlist_ast = (
+        #         self.visit(vlist_ctx) if vlist_ctx else None
+        #     ) 
+
+        #     or_expr = None
+        #     values = vlist_ast.children if isinstance(vlist_ast, ValueListNode) else []
+        #     for val in values:
+        #         eq = BinaryEqualExprNode()
+        #         eq.add(left)
+        #         eq.add(val)
+        #         if or_expr is None:
+        #             or_expr = eq
+        #         else:
+        #             new_or = BinaryOrExprNode()
+        #             new_or.add(or_expr)
+        #             new_or.add(eq)
+        #             or_expr = new_or
+
+        #     if ctx.NOT():
+        #         not_node = ExprNode()
+        #         not_node.add(or_expr)
+        #         return not_node
+
+        #     return
         if ctx.IN():
             left = self.visit(ctx.additiveExpression(0))
 
-            vlist_ctx = ctx.valueList(0) if ctx.valueList() else None
-            vlist_ast = (
-                self.visit(vlist_ctx) if vlist_ctx else None
-            ) 
+            vlist_ctx = ctx.valueList(0)
+            vlist_ast = self.visit(vlist_ctx)
 
-            or_expr = None
-            values = vlist_ast.children if isinstance(vlist_ast, ValueListNode) else []
-            for val in values:
-                eq = BinaryEqualExprNode()
-                eq.add(left)
-                eq.add(val)
-                if or_expr is None:
-                    or_expr = eq
-                else:
-                    new_or = BinaryOrExprNode()
-                    new_or.add(or_expr)
-                    new_or.add(eq)
-                    or_expr = new_or
-
+            node = ExprNode()
             if ctx.NOT():
-                not_node = ExprNode()
-                not_node.add(or_expr)
-                return not_node
+                node.add(StringLiteralNode(text="NOT"))
 
-            return
+            node.add(StringLiteralNode(text="IN"))
+            node.add(left)
 
-        # # ---------- EXISTS ----------
-        # if ctx.EXISTS():
-        #     # EXISTS (selectStatement)
-        #     select_ctx = ctx.selectStatement()
-        #     if select_ctx:
-        #         select_ast = self.visit(select_ctx)
-        #         node = ExprNode()
-        #         node.add(StringLiteralNode(text="EXISTS"))
-        #         node.add(select_ast)
-        #         return node
+            if vlist_ast:
+                node.add(vlist_ast)
 
+            return node
+
+            
         # ---------- BETWEEN ----------
         if ctx.BETWEEN():
             col = self.visit(ctx.additiveExpression(0))
@@ -597,8 +616,8 @@ class ASTBuilder(SQLPARSERVisitor):
         )
 
         # ---------- LIKE / NOT LIKE ----------
-        if ctx.LIKE():
-            left = self.visit(add_exprs[0]) if add_exprs else None
+        if ctx.LIKE():        
+            left = self.visit(add_exprs[0]) if add_exprs else None  
 
             pattern_token = None
             try:
@@ -614,17 +633,23 @@ class ASTBuilder(SQLPARSERVisitor):
             )
 
             if left and pattern:
-                return LikeNode(left, pattern, negated=ctx.NOT() is not None)
+               
+                is_negated = bool(ctx.NOT())             
+                return LikeNode(left, pattern, negated=is_negated)
 
             # fallback
             node = ExprNode()
+            node.add(StringLiteralNode(text="LIKE"))
             node.add(StringLiteralNode(text=ctx.getText()))
             return node
+        
+        if hasattr(ctx, 'existsExpression') and ctx.existsExpression():
+            return self.visit(ctx.existsExpression())
 
         if ctx.getChildCount() == 1:
             return self.visit(ctx.getChild(0))
 
-        # ---------- المقارنات الثنائية العامة (=, >, <, >=, <=, <>) ----------
+        # ---------- (=, >, <, >=, <=, <>) ----------
         if len(add_exprs) >= 2:
             left = self.visit(add_exprs[0])
             right = self.visit(add_exprs[1])
@@ -653,6 +678,16 @@ class ASTBuilder(SQLPARSERVisitor):
         node = ExprNode()
         node.add(StringLiteralNode(text=text))
         return node
+    
+    def visitExistsExpression(self, ctx):
+        is_negated = True if ctx.NOT() else False
+        node = EXISTS(negated=is_negated)        
+        select_ast = self.visit(ctx.selectStatement())
+        if select_ast:
+            node.add(select_ast)
+
+        return node
+    
 
     def visitIdentityConstraint(self, ctx) -> IdentityConstraintNode:
         return IdentityConstraintNode()
@@ -679,32 +714,7 @@ class ASTBuilder(SQLPARSERVisitor):
 
         return item
 
-    # def visitJoinClause(self, ctx: SQLPARSER.JoinClauseContext) -> JoinNode:
-    #     node = JoinNode()
 
-    #     # نوع الـ JOIN (اختياري)
-    #     join_type_token = None
-    #     for t in [ctx.INNER(), ctx.LEFT(), ctx.RIGHT(), ctx.FULL(), ctx.CROSS()]:
-    #         if t is not None:
-    #             join_type_token = t
-    #             break
-    #     if join_type_token is not None:
-    #         node.add(StringLiteralNode(text=join_type_token.getText()))
-
-    #     if ctx.columnList():
-    #         cols_ast = self.visit(ctx.columnList())
-    #         if cols_ast:
-    #             node.add(cols_ast)
-
-    #     if ctx.expression():
-    #         on_expr = self.visit(ctx.expression())
-    #         if on_expr:
-    #             on_node = ExprNode()
-    #             on_node.add(StringLiteralNode(text="ON"))
-    #             on_node.add(on_expr)
-    #             node.add(on_node)
-
-    #     return node
 
     def visitJoinClause(self, ctx: SQLPARSER.JoinClauseContext) -> JoinNode:
         node = JoinNode()
@@ -859,15 +869,42 @@ class ASTBuilder(SQLPARSERVisitor):
         node.add(ref_table)
         node.add(cols_ref)
         return node
+    
+    def visitPrimaryExpression(self, ctx):
+    # (SELECT ...)
+        if ctx.selectStatement():
+            select_ast = self.visit(ctx.selectStatement())
+            return SubqueryExprNode(select_ast)
 
-    def visitPrimaryKeyConstraint(
-        self, ctx: SQLPARSER.PrimaryKeyConstraintContext
-    ) -> PrimaryKeyConstraintNode:
+        # (expression)
+        if ctx.expression():
+            return self.visit(ctx.expression())
+
+        return self.visitChildren(ctx)
+
+    def visitPrimaryKeyConstraint(self, ctx):
         node = PrimaryKeyConstraintNode()
-        cols = self.visit(ctx.columnList())
-        node.add(cols)
+        for col_ctx in ctx.columnName():
+            col_ast = self.visit(col_ctx)
+            if col_ast:
+                node.add(col_ast)
+
         return node
 
+    
+    def visitNotExpression(self, ctx):
+        if ctx.NOT():
+            child = self.visit(ctx.notExpression())        
+            if hasattr(child, 'negated'):
+                child.negated = not child.negated
+                return child
+            not_node = ExprNode()
+            not_node.add(StringLiteralNode(text="NOT"))
+            not_node.add(child)
+            return not_node
+            
+        return self.visitChildren(ctx)
+        
     def visitUniqueConstraint(
         self, ctx: SQLPARSER.UniqueConstraintContext
     ) -> UniqueConstraintNode:
@@ -1005,9 +1042,7 @@ class ASTBuilder(SQLPARSERVisitor):
                 node.add(t_ast)
         return node
 
-    def visitTruncateStatement(self, ctx):
-        table = self.visit(ctx.tableName())
-        return TruncateTableNode(table)
+   
     
     # ---------- IF statement ----------
     
@@ -1043,3 +1078,26 @@ class ASTBuilder(SQLPARSERVisitor):
             if ast:
                 node.add(ast)
         return node
+    
+
+
+
+# ---------- Use ----------
+
+    def visitUseStatement(self, ctx):
+        node = UseNode()
+        db_name = ctx.identifier().getText()
+        node.add(DatabaseIdentifierNode(db_name))
+        return node
+
+
+    def visitTruncateStatement(self, ctx):
+        node = TruncateTableNode() 
+        table_ast = self.visit(ctx.tableName())
+        
+        if table_ast:
+            node.add(table_ast)
+            
+        return node
+
+    

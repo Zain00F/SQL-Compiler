@@ -19,6 +19,7 @@ sqlStatement: selectStatement
             | dropStatement
             | ifStatement        
             | beginEndBlock
+            | useStatement 
             | unifiers
             | goStatement
             | truncateStatement
@@ -298,7 +299,11 @@ columnList: column (COMMA column)* ;
 
 column: (columnName | sumColumn | expression) (asAlias|assignAlias)?;
 
-columnName: (alias | MULTIPLY) (DOT IDENTIFIER)* (DOT MULTIPLY)?;
+// columnName: (alias | MULTIPLY) (DOT IDENTIFIER)* (DOT MULTIPLY)?;
+columnName
+    : (identifier | MULTIPLY)
+      (DOT (identifier | MULTIPLY))*
+    ;
 
 tableName: identifier (DOT identifier)* (asAlias)?;
 
@@ -468,9 +473,14 @@ orExpression: andExpression (OR andExpression)*;
 
 andExpression: notExpression (AND notExpression)*;
 
-notExpression: NOT notExpression | comparisonExpression;
+notExpression
+    : NOT notExpression
+    | comparisonExpression
+    ;
 
-comparisonExpression: additiveExpression 
+
+comparisonExpression: existsExpression
+                    | additiveExpression 
                     ( (EQUALS | NOT_EQUAL | GREATER_THAN | LESS_THAN | GREATER_EQUAL | LESS_EQUAL| NOT_GREATER_THAN | NOT_LESS_THAN) additiveExpression 
                     | NOT? IN LEFT_PAREN (valueList) RIGHT_PAREN
                     | NOT? LIKE SINGLE_QUOTE_STRING
@@ -480,26 +490,31 @@ comparisonExpression: additiveExpression
                     | whereCte LEFT_PAREN (selectStatement | valueList) RIGHT_PAREN
                     ;
 
+
+
 additiveExpression: multiplicativeExpression ((PLUS | MINUS) multiplicativeExpression)*;
 
 multiplicativeExpression: primaryExpression ((MULTIPLY | DIVIDE) primaryExpression)*;
 
-primaryExpression: signedLiteral  
-                 |literal
-                 | columnName
-                 | scalarFunction
-                 | USER_VARIABLE
-                 | SYSTEM_VARIABLE
-                 |existsExpression     
-                 | LEFT_PAREN expression RIGHT_PAREN
-                 | LEFT_PAREN selectStatement RIGHT_PAREN
-                 | sumColumn
-                 ;
 
 
-existsExpression
-    : NOT? EXISTS LEFT_PAREN selectStatement RIGHT_PAREN
+primaryExpression
+    : signedLiteral
+    | literal
+    | columnName
+    | scalarFunction
+    | USER_VARIABLE
+    | SYSTEM_VARIABLE
+    | '(' expression ')'
+    | LEFT_PAREN selectStatement RIGHT_PAREN
+    | sumColumn
     ;
+    
+existsExpression
+    : EXISTS LEFT_PAREN selectStatement RIGHT_PAREN
+    | NOT EXISTS LEFT_PAREN selectStatement RIGHT_PAREN
+    ;
+
 
 // For functions like CONCAT that take multiple expressions
 
@@ -546,17 +561,27 @@ ifStatement
       (ELSE sqlStatementOrBlock)?
     ;
 
-
-
 sqlStatementOrBlock
     : sqlStatement
     | beginEndBlock
     ;
 
+//beginEnd
+
 beginEndBlock
     : BEGIN (sqlStatement | SEMICOLON)* END
     ;
 
+// Use STATEMENT
+
+useStatement
+    : USE identifier SEMICOLON?
+    ;
+
+
+//توليد ملفات القواعد في البداية 
+//java -jar C:\antlr\antlr-4.13.1-complete.jar -Dlanguage=Python3 grammar/SQL.g4 
+// java -jar C:\antlr\antlr-4.13.1-complete.jar -Dlanguage=Python3 grammar/SQLPARSER.g4
 
 // بعد التعديل على ملف SQLPARSER شغل الاوامر
 // java -jar C:\antlr\antlr-4.13.1-complete.jar -Dlanguage=Python3 grammar/SQLPARSER.g4

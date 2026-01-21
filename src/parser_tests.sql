@@ -85,6 +85,7 @@
 -- SELECT CONCAT(LastName,', ',FirstName) AS fullname
 -- FROM employees
 
+
 -- use employee_db
 -- go
 
@@ -99,7 +100,7 @@
 -- );
 
 -- TRUNCATE TABLE EmployeeMaster;
--- GO;
+-- GO
 
 
 -- INSERT INTO EmployeeMaster(EmployeeCode, EmployeeName, DepartmentCode, LocationCode ,salary)
@@ -114,7 +115,7 @@
 
 
 
--- SELECT * FROM EmployeeMaster WHERE salary IS NOT NULL ;
+SELECT * FROM EmployeeMaster WHERE salary IS NOT NULL ;
 
 -- SELECT * FROM EmployeeMaster WHERE salary IS NULL ;
 
@@ -140,14 +141,12 @@
 -- SELECT * FROM EmployeeMaster WHERE employeename LIKE 'ra[nj]u%'
 
 -- /*will return 4 letter names starting with ra, NOT containing n or j in between and ending in u*/
--- SELECT * from EmployeeMaster WHERE employeename LIKE 'ra[^nj]u%'
+-- SELECT * FROM EmployeeMaster WHERE employeename LIKE 'ra[^nj]u%'
 
--- SELECT * from EmployeeMaster WHERE employeename NOT LIKE 'raj%'
+-- select * from EmployeeMaster WHERE employeename NOT LIKE 'raj%'
 
--- select * from EmployeeMaster WHERE EXISTS
-
---******
--- (select * FROM EmployeeMaster where EmployeeName  LIKE 'superman')
+-- SELECT * FROM EmployeeMaster WHERE EXISTS
+-- (SELECT * FROM EmployeeMaster WHERE EmployeeName  LIKE 'superman')
 
 
 
@@ -181,8 +180,7 @@
 
 
 
-
--- IF not exists (select * from sysobjects where name='TRACKING' and xtype='U')
+-- IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='TRACKING' AND xtype='U')
 
 -- BEGIN
 
@@ -249,3 +247,26 @@
 -- )
 
 -- GO
+
+
+-- SELECT EmployeeName 
+-- FROM Employees 
+-- WHERE EXISTS (
+--     SELECT 1 
+--     FROM SalaryPayments 
+--     WHERE SalaryPayments.EmployeeID = Employees.ID
+-- );
+
+-- IF NOT EXISTS (SELECT * FROM Customers WHERE Email = 'test@example.com')
+-- BEGIN
+--     INSERT INTO Customers (CustomerName, Email) 
+--     VALUES ('New Customer', 'test@example.com');
+-- END
+
+-- SELECT * FROM Products 
+-- WHERE Price > 100 
+-- AND EXISTS (
+--     SELECT * FROM Inventory 
+--     WHERE Inventory.ProductID = Products.ID 
+--     AND Quantity > 0
+-- );
